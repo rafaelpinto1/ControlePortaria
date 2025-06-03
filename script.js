@@ -38,6 +38,19 @@ document.addEventListener("DOMContentLoaded", () => {
     return tokenResponse.accessToken;
   }
 
+  async function getRequestDigest(token, siteUrl) {
+    const response = await fetch(`${siteUrl}/_api/contextinfo`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json;odata=verbose",
+      },
+    });
+    if (!response.ok) throw new Error("Falha ao obter Request Digest");
+    const data = await response.json();
+    return data.d.GetContextWebInformation.FormDigestValue;
+  }
+
   function calcularDuracao(entrada, saida) {
     const [h1, m1] = entrada.split(":").map(Number);
     const [h2, m2] = saida.split(":").map(Number);
@@ -59,13 +72,13 @@ document.addEventListener("DOMContentLoaded", () => {
       Observacoes: form.observacoes.value.trim(),
     };
 
-    const duracao = calcularDuracao(dados.Entrada, dados.Saida);
-    const token = await loginEObterToken();
-
-    const siteUrl = "https://gsilvainfo.sharepoint.com/sites/Inf";
-    const listName = "ControlePortaria";
-
     try {
+      const token = await loginEObterToken();
+      const siteUrl = "https://gsilvainfo.sharepoint.com/sites/Inf";
+      const listName = "ControlePortaria";
+
+      const digest = await getRequestDigest(token, siteUrl);
+
       const response = await fetch(
         `${siteUrl}/_api/web/lists/getbytitle('${listName}')/items`,
         {
@@ -74,6 +87,7 @@ document.addEventListener("DOMContentLoaded", () => {
             Authorization: `Bearer ${token}`,
             Accept: "application/json;odata=verbose",
             "Content-Type": "application/json;odata=verbose",
+            "X-RequestDigest": digest,
           },
           body: JSON.stringify({
             __metadata: { type: "SP.Data.ControlePortariaListItem" },
@@ -84,6 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (!response.ok) throw new Error("Erro ao gravar no SharePoint");
 
+      const duracao = calcularDuracao(dados.Entrada, dados.Saida);
       const ehGSilva = dados.Setor.toLowerCase().includes("g. silva");
       if (ehGSilva && (duracao < 7 || duracao > 9)) {
         await fetch("https://<NOME_DA_FUNCTION>.azurewebsites.net/api/notificarHorario", {
