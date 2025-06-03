@@ -8,10 +8,10 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   const msalInstance = new msal.PublicClientApplication(msalConfig);
-
   const btnLogin = document.getElementById("btn-login");
   const form = document.getElementById("form-portaria");
   let currentAccount = null;
+  let accessToken = "";
 
   btnLogin.addEventListener("click", async () => {
     try {
@@ -19,37 +19,22 @@ document.addEventListener("DOMContentLoaded", () => {
         scopes: ["User.Read", "Sites.ReadWrite.All", "Mail.Send"],
       });
       currentAccount = loginResponse.account;
+      msalInstance.setActiveAccount(currentAccount);
+
+      // Obter token
+      const tokenResponse = await msalInstance.acquireTokenSilent({
+        scopes: ["Sites.ReadWrite.All", "Mail.Send"],
+        account: currentAccount,
+      });
+      accessToken = tokenResponse.accessToken;
 
       btnLogin.style.display = "none";
       form.style.display = "block";
+      document.getElementById("status").innerText = "Logado como: " + currentAccount.username;
     } catch (err) {
       alert("Falha no login: " + err.message);
     }
   });
-
-  async function loginEObterToken() {
-    if (!currentAccount) {
-      throw new Error("Usuário não autenticado");
-    }
-    const tokenResponse = await msalInstance.acquireTokenSilent({
-      scopes: ["Sites.ReadWrite.All", "Mail.Send"],
-      account: currentAccount,
-    });
-    return tokenResponse.accessToken;
-  }
-
-  async function getRequestDigest(token, siteUrl) {
-    const response = await fetch(`${siteUrl}/_api/contextinfo`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json;odata=verbose",
-      },
-    });
-    if (!response.ok) throw new Error("Falha ao obter Request Digest");
-    const data = await response.json();
-    return data.d.GetContextWebInformation.FormDigestValue;
-  }
 
   function calcularDuracao(entrada, saida) {
     const [h1, m1] = entrada.split(":").map(Number);
@@ -59,6 +44,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function enviarDados(e) {
     e.preventDefault();
+
+    if (!accessToken) {
+      alert("Você precisa fazer login antes de enviar.");
+      return;
+    }
 
     const dados = {
       Title: form.nome.value.trim(),
@@ -72,33 +62,39 @@ document.addEventListener("DOMContentLoaded", () => {
       Observacoes: form.observacoes.value.trim(),
     };
 
+    const duracao = calcularDuracao(dados.Entrada, dados.Saida);
+
     try {
-      const token = await loginEObterToken();
-      const siteUrl = "https://gsilvainfo.sharepoint.com/sites/Inf";
-      const listName = "ControlePortaria";
+      // Obter siteId do SharePoint
+      const siteResp = await fetch(
+        "https://graph.microsoft.com/v1.0/sites/gsilvainfo.sharepoint.com:/sites/Inf",
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
 
-      const digest = await getRequestDigest(token, siteUrl);
+      if (!siteResp.ok) throw new Error("Erro ao obter site do SharePoint");
 
-      const response = await fetch(
-        `${siteUrl}/_api/web/lists/getbytitle('${listName}')/items`,
+      const siteJson = await siteResp.json();
+      const siteId = siteJson.id.split(",")[1]; // Pega só o GUID do site
+
+      // Enviar item para lista ControlePortaria via Graph API
+      const postResp = await fetch(
+        `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/ControlePortaria/items`,
         {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json;odata=verbose",
-            "Content-Type": "application/json;odata=verbose",
-            "X-RequestDigest": digest,
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            __metadata: { type: "SP.Data.ControlePortariaListItem" },
-            ...dados,
-          }),
+          body: JSON.stringify({ fields: dados }),
         }
       );
 
-      if (!response.ok) throw new Error("Erro ao gravar no SharePoint");
+      if (!postResp.ok) {
+        const errorJson = await postResp.json();
+        throw new Error(errorJson.error.message);
+      }
 
-      const duracao = calcularDuracao(dados.Entrada, dados.Saida);
+      // Se setor é "g. silva" e duração < 7 ou > 9, chama Azure Function
       const ehGSilva = dados.Setor.toLowerCase().includes("g. silva");
       if (ehGSilva && (duracao < 7 || duracao > 9)) {
         await fetch("https://<NOME_DA_FUNCTION>.azurewebsites.net/api/notificarHorario", {
@@ -112,7 +108,7 @@ document.addEventListener("DOMContentLoaded", () => {
       form.reset();
     } catch (err) {
       console.error("Erro ao enviar:", err);
-      alert("Erro ao enviar os dados.");
+      alert("Erro ao enviar os dados: " + err.message);
     }
   }
 
