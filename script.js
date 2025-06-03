@@ -8,14 +8,32 @@ const msalConfig = {
 
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 
+const btnLogin = document.getElementById("btn-login");
+const form = document.getElementById("form-portaria");
+let currentAccount = null;
+
+btnLogin.addEventListener("click", async () => {
+  try {
+    const loginResponse = await msalInstance.loginPopup({
+      scopes: ["User.Read", "Sites.ReadWrite.All", "Mail.Send"],
+    });
+    currentAccount = loginResponse.account;
+
+    btnLogin.style.display = "none";
+    form.style.display = "block";
+  } catch (err) {
+    alert("Falha no login: " + err.message);
+  }
+});
+
 async function loginEObterToken() {
-  const loginResponse = await msalInstance.loginPopup({
-    scopes: ["User.Read", "Sites.ReadWrite.All", "Mail.Send"],
-  });
+  if (!currentAccount) {
+    throw new Error("Usuário não autenticado");
+  }
 
   const tokenResponse = await msalInstance.acquireTokenSilent({
     scopes: ["Sites.ReadWrite.All", "Mail.Send"],
-    account: loginResponse.account,
+    account: currentAccount,
   });
 
   return tokenResponse.accessToken;
@@ -30,7 +48,6 @@ function calcularDuracao(entrada, saida) {
 async function enviarDados(e) {
   e.preventDefault();
 
-  const form = document.getElementById("form-portaria");
   const dados = {
     Title: form.nome.value.trim(),
     Data: form.data.value,
@@ -86,5 +103,5 @@ async function enviarDados(e) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("form-portaria").addEventListener("submit", enviarDados);
+  form.addEventListener("submit", enviarDados);
 });
