@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Controle de Portaria - G. Silva</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Controle de Portaria</h1>
+    <form id="form-portaria">
+      <label>Data:
+        <input type="date" name="data" required />
+      </label>
+      <label>Nome:
+        <input type="text" name="nome" required />
+      </label>
+      <label>Tipo de Serviço:
+        <input type="text" name="tipoServico" required />
+      </label>
+      <label>Setor:
+        <input type="text" name="setor" required />
+      </label>
+      <label>Veículo/Placa:
+        <input type="text" name="veiculoPlaca" />
+      </label>
+      <label>Destino:
+        <input type="text" name="destino" required />
+      </label>
+      <label>Entrada:
+        <input type="time" name="entrada" required />
+      </label>
+      <label>Saída:
+        <input type="time" name="saida" required />
+      </label>
+      <label>Observações:
+        <textarea name="observacoes"></textarea>
+      </label>
+      <button type="submit">Enviar</button>
+    </form>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
