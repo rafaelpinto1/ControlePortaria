@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Controle de Portaria - G. Silva</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"></script>
@@ -10,7 +10,10 @@
 <body>
   <div class="container">
     <h1>Controle de Portaria</h1>
-    <form id="form-portaria">
+
+    <button id="btn-login">Login Microsoft</button>
+
+    <form id="form-portaria" style="display:none;">
       <label>Data:
         <input type="date" name="data" required />
       </label>
